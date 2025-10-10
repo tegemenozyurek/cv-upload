@@ -1,54 +1,64 @@
-// S3 adapter using presigned URLs via backend /api
+// S3 adapter for frontend-only listing of public bucket contents (no backend).
+// It expects the bucket to allow public ListBucket and GetObject, and CORS to
+// allow GET from this origin. No AWS credentials are used in the browser.
 
-async function json(input, init) {
-    const res = await fetch(input, init)
-    if (!res.ok) throw new Error(await res.text())
-    return res.json()
-}
+const BUCKET = import.meta.env.VITE_S3_BUCKET || 'cv-upload-bucket1'
+const REGION = import.meta.env.VITE_S3_REGION || 'eu-north-1'
+const PREFIX = import.meta.env.VITE_S3_PREFIX || ''
 
-async function addCv(file) {
-    // 1) request presigned URL
-    const presign = await json('/api/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: file.name, type: file.type })
-    })
-    // 2) upload to S3 directly
-    const putRes = await fetch(presign.url, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file,
-    })
-    if (!putRes.ok) throw new Error('S3 upload failed')
-    return presign.key
+function buildObjectUrl(key) {
+    // Use the regional virtual-hosted–style URL
+    const encoded = encodeURIComponent(key).replace(/%2F/g, '/')
+    return `https://${BUCKET}.s3.${REGION}.amazonaws.com/${encoded}`
 }
 
 async function listCvs() {
-    const data = await json('/api/list')
-    // normalize to match UI expectations
-    return data.items.map((o) => ({
-        id: o.key,
-        name: o.name,
-        size: o.size,
-        type: o.type || 'file',
-        createdAt: o.lastModified || Date.now(),
-        // no blob in S3 mode
-    }))
+    // Unauthenticated ListObjectsV2 request that returns XML
+    const base = `https://${BUCKET}.s3.${REGION}.amazonaws.com`
+    const url = `${base}?list-type=2${PREFIX ? `&prefix=${encodeURIComponent(PREFIX)}` : ''}&max-keys=1000`
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`S3 list failed: ${res.status}`)
+    const xmlText = await res.text()
+
+    // Parse XML
+    const doc = new window.DOMParser().parseFromString(xmlText, 'application/xml')
+    const contents = Array.from(doc.getElementsByTagName('Contents'))
+
+    const items = contents.map((c) => {
+        const key = c.getElementsByTagName('Key')[0]?.textContent || ''
+        const lastModified = c.getElementsByTagName('LastModified')[0]?.textContent || ''
+        const sizeStr = c.getElementsByTagName('Size')[0]?.textContent || '0'
+        const size = Number(sizeStr) || 0
+        const name = decodeURIComponent(key.split('/').pop() || key)
+        const url = buildObjectUrl(key)
+        return {
+            id: key,
+            name,
+            size,
+            type: name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'file',
+            createdAt: Date.parse(lastModified) || Date.now(),
+            url,
+        }
+    })
+
+    // Filter to PDFs only per requirement
+    return items.filter((i) => i.name.toLowerCase().endsWith('.pdf'))
 }
 
 async function getCv(id) {
-    const data = await json(`/api/download-url?key=${encodeURIComponent(id)}`)
-    const res = await fetch(data.url)
+    // Fetch object bytes if needed (used by existing Download button)
+    const res = await fetch(buildObjectUrl(id))
+    if (!res.ok) throw new Error('S3 download failed')
     const blob = await res.blob()
     return { id, name: id.split('/').pop(), size: blob.size, type: blob.type, blob, createdAt: Date.now() }
 }
 
-async function deleteCv(id) {
-    await json('/api/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: id })
-    })
+async function addCv() {
+    throw new Error('Upload is disabled in frontend-only S3 mode')
+}
+
+async function deleteCv() {
+    throw new Error('Delete is disabled in frontend-only S3 mode')
 }
 
 export const s3StorageAdapter = { addCv, listCvs, getCv, deleteCv }
