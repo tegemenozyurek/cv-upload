@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
-import { listCvs } from './storage'
+import { listCvs, getCv, deleteCv } from './storage'
 
 function formatBytes(bytes) {
 	if (!Number.isFinite(bytes)) return '';
@@ -14,7 +14,17 @@ function formatBytes(bytes) {
 	return `${size.toFixed(size >= 100 ? 0 : size >= 10 ? 1 : 2)} ${units[unitIdx]}`;
 }
 
-// no download helper needed; we link directly to S3
+function downloadBlob(record) {
+	if (!record?.blob) return;
+	const url = URL.createObjectURL(record.blob);
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = record.name || 'cv';
+	document.body.appendChild(a);
+	a.click();
+	URL.revokeObjectURL(url);
+	a.remove();
+}
 
 function App() {
     const [items, setItems] = useState([])
@@ -59,7 +69,25 @@ function App() {
 		localStorage.setItem('theme', next)
 	}
 
-    // Upload/Delete/Download actions are intentionally removed in read-only mode
+	async function handleDownload(id) {
+		setError('')
+		try {
+			const record = await getCv(id)
+			if (record) downloadBlob(record)
+		} catch (e) {
+			setError(e?.message || 'Download failed')
+		}
+	}
+
+	async function handleDelete(id) {
+		setError('')
+		try {
+			await deleteCv(id)
+			setItems((prev) => prev.filter((r) => r.id !== id))
+		} catch (e) {
+			setError(e?.message || 'Delete failed')
+		}
+	}
 
 	return (
 		<>
@@ -86,10 +114,27 @@ function App() {
                     {items.map((r) => (
                         <li key={r.id} className="cv-item">
                             <div className="meta">
-                                <a className="name" href={r.url} target="_blank" rel="noreferrer noopener">{r.name}</a>
+                                <div className="name">{r.name}</div>
                                 <div className="details">
                                     {formatBytes(r.size)} · {new Date(r.createdAt).toLocaleString()} · {r.type || 'file'}
                                 </div>
+                            </div>
+                            <div className="actions">
+                                <button onClick={() => handleDownload(r.id)} title="Download">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="7,10 12,15 17,10"/>
+                                        <line x1="12" y1="15" x2="12" y2="3"/>
+                                    </svg>
+                                </button>
+                                <button className="danger" onClick={() => handleDelete(r.id)} title="Delete">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="3,6 5,6 21,6"/>
+                                        <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
+                                        <line x1="10" y1="11" x2="10" y2="17"/>
+                                        <line x1="14" y1="11" x2="14" y2="17"/>
+                                    </svg>
+                                </button>
                             </div>
                         </li>
                     ))}
