@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
-import { listCvs, getCv, deleteCv } from './storage'
+import { listCvs, getCv, deleteCv, addCv } from './storage'
 
 function formatBytes(bytes) {
 	if (!Number.isFinite(bytes)) return '';
@@ -89,6 +89,21 @@ function App() {
 		}
 	}
 
+	async function handleUpload(event) {
+		const file = event.target.files && event.target.files[0]
+		if (!file) return
+		setError('')
+		try {
+			const id = await addCv(file)
+			const fresh = await listCvs()
+			setItems(fresh)
+		} catch (e) {
+			setError(e?.message || 'Upload failed')
+		} finally {
+			if (fileInputRef.current) fileInputRef.current.value = ''
+		}
+	}
+
 	return (
 		<>
 		<button className="theme-toggle" aria-label="Toggle theme" title="Toggle theme" onClick={toggleTheme}>
@@ -98,10 +113,30 @@ function App() {
 		<div className="container">
 			<div className="topbar">
 				<h1>CV Uploads</h1>
+				<div className="upload-section">
+					<input
+						ref={fileInputRef}
+						type="file"
+						accept=".pdf,.doc,.docx,.txt,.rtf,.png,.jpg,.jpeg"
+						onChange={handleUpload}
+						style={{ display: 'none' }}
+						id="file-upload"
+					/>
+					<button 
+						className="upload-btn"
+						onClick={() => fileInputRef.current?.click()}
+					>
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+							<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+							<polyline points="14,2 14,8 20,8"/>
+							<line x1="16" y1="13" x2="8" y2="13"/>
+							<line x1="16" y1="17" x2="8" y2="17"/>
+							<polyline points="10,9 9,9 8,9"/>
+						</svg>
+						New CV Upload
+					</button>
+				</div>
 			</div>
-
-
-            {/* Upload controls removed for S3 read-only listing */}
 
 			{error && <div className="error">{error}</div>}
 
