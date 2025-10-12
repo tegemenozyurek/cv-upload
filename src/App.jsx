@@ -27,10 +27,12 @@ function downloadBlob(record) {
 }
 
 function App() {
-    const [items, setItems] = useState([])
+	const [items, setItems] = useState([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState('')
 	const [theme, setTheme] = useState('dark')
+	const [uploadProgress, setUploadProgress] = useState(0)
+	const [isUploading, setIsUploading] = useState(false)
     const fileInputRef = useRef(null)
 
 	useEffect(() => {
@@ -97,14 +99,37 @@ function App() {
 	async function handleUpload(event) {
 		const file = event.target.files && event.target.files[0]
 		if (!file) return
+		
 		setError('')
+		setIsUploading(true)
+		setUploadProgress(0)
+		
 		try {
+			// Simulate progress for better UX
+			const progressInterval = setInterval(() => {
+				setUploadProgress(prev => {
+					if (prev >= 90) return prev
+					return prev + Math.random() * 10
+				})
+			}, 200)
+			
 			const id = await addCv(file)
+			
+			clearInterval(progressInterval)
+			setUploadProgress(100)
+			
+			// Wait a bit to show 100% completion
+			await new Promise(resolve => setTimeout(resolve, 500))
+			
+			// Refresh the list to show new upload
 			const fresh = await loadAllCvs()
 			setItems(fresh)
+			
 		} catch (e) {
 			setError(e?.message || 'Upload failed')
 		} finally {
+			setIsUploading(false)
+			setUploadProgress(0)
 			if (fileInputRef.current) fileInputRef.current.value = ''
 		}
 	}
@@ -144,6 +169,18 @@ function App() {
 			</div>
 
 			{error && <div className="error">{error}</div>}
+
+			{isUploading && (
+				<div className="upload-progress">
+					<div className="progress-bar">
+						<div 
+							className="progress-fill" 
+							style={{ width: `${uploadProgress}%` }}
+						></div>
+					</div>
+					<div className="progress-text">Uploading... {Math.round(uploadProgress)}%</div>
+				</div>
+			)}
 
 			{isLoading ? (
 				<div>Loading...</div>
