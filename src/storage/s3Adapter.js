@@ -53,8 +53,24 @@ async function getCv(id) {
     return { id, name: id.split('/').pop(), size: blob.size, type: blob.type, blob, createdAt: Date.now() }
 }
 
-async function addCv() {
-    throw new Error('Upload is disabled in frontend-only S3 mode')
+async function addCv(file) {
+    // Simple upload to S3 using public bucket (requires bucket to allow public PUT)
+    const key = `uploads/${Date.now()}-${file.name}`
+    const url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${encodeURIComponent(key)}`
+    
+    const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': file.type || 'application/octet-stream',
+        },
+        body: file,
+    })
+    
+    if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`)
+    }
+    
+    return key
 }
 
 async function deleteCv() {

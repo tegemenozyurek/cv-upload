@@ -46,8 +46,8 @@ function App() {
 			document.documentElement.setAttribute('data-theme', initial)
 		}
 
-        let isMounted = true
-        listCvs()
+		let isMounted = true
+		loadAllCvs()
 			.then((rows) => {
 				if (isMounted) setItems(rows)
 			})
@@ -61,6 +61,11 @@ function App() {
 			isMounted = false
 		}
 	}, [])
+
+	async function loadAllCvs() {
+		// Load only S3 CVs
+		return await listCvs()
+	}
 
 	function toggleTheme() {
 		const next = theme === 'dark' ? 'light' : 'dark'
@@ -95,7 +100,7 @@ function App() {
 		setError('')
 		try {
 			const id = await addCv(file)
-			const fresh = await listCvs()
+			const fresh = await loadAllCvs()
 			setItems(fresh)
 		} catch (e) {
 			setError(e?.message || 'Upload failed')
