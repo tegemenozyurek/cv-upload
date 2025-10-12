@@ -15,16 +15,48 @@ function buildObjectUrl(key) {
 async function listCvs() {
     // Unauthenticated ListObjectsV2 request that returns XML
     const base = `https://${BUCKET}.s3.${REGION}.amazonaws.com`
-    const url = `${base}?list-type=2${PREFIX ? `&prefix=${encodeURIComponent(PREFIX)}` : ''}&max-keys=1000`
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`S3 list failed: ${res.status}`)
-    const xmlText = await res.text()
+    
+    console.log('Fetching S3 objects from:', base)
+    
+    try {
+        // Try to get all files at once first
+        const allRes = await fetch(`${base}?list-type=2&max-keys=1000`)
+        console.log('All files response status:', allRes.status)
+        
+        if (allRes.ok) {
+            const allXml = await allRes.text()
+            console.log('All files XML:', allXml)
+            const allItems = parseXmlToItems(allXml)
+            console.log('All parsed items:', allItems)
+            
+            // Filter to common document types and remove duplicates
+            const documentExtensions = ['.pdf', '.doc', '.docx', '.txt', '.rtf', '.png', '.jpg', '.jpeg']
+            const documentItems = allItems.filter((i) => {
+                const ext = i.name.toLowerCase().substring(i.name.lastIndexOf('.'))
+                return documentExtensions.includes(ext)
+            })
+            
+            const uniqueItems = documentItems.filter((item, index, self) => 
+                index === self.findIndex(t => t.id === item.id)
+            )
+            
+            console.log('Final document items:', uniqueItems)
+            return uniqueItems
+        } else {
+            console.error('Failed to fetch all files:', allRes.status, allRes.statusText)
+            throw new Error(`S3 list failed: ${allRes.status}`)
+        }
+    } catch (error) {
+        console.error('Error fetching S3 objects:', error)
+        throw error
+    }
+}
 
-    // Parse XML
+function parseXmlToItems(xmlText) {
     const doc = new window.DOMParser().parseFromString(xmlText, 'application/xml')
     const contents = Array.from(doc.getElementsByTagName('Contents'))
 
-    const items = contents.map((c) => {
+    return contents.map((c) => {
         const key = c.getElementsByTagName('Key')[0]?.textContent || ''
         const lastModified = c.getElementsByTagName('LastModified')[0]?.textContent || ''
         const sizeStr = c.getElementsByTagName('Size')[0]?.textContent || '0'
@@ -40,9 +72,6 @@ async function listCvs() {
             url,
         }
     })
-
-    // Filter to PDFs only per requirement
-    return items.filter((i) => i.name.toLowerCase().endsWith('.pdf'))
 }
 
 async function getCv(id) {
@@ -53,8 +82,24 @@ async function getCv(id) {
     return { id, name: id.split('/').pop(), size: blob.size, type: blob.type, blob, createdAt: Date.now() }
 }
 
-async function addCv() {
-    throw new Error('Upload is disabled in frontend-only S3 mode')
+async function addCv(file) {
+    // Simple upload to S3 using public bucket (requires bucket to allow public PUT)
+    const key = `uploads/${Date.now()}-${file.name}`
+    const url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${encodeURIComponent(key)}`
+    
+    const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': file.type || 'application/octet-stream',
+        },
+        body: file,
+    })
+    
+    if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`)
+    }
+    
+    return key
 }
 
 async function deleteCv() {

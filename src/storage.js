@@ -5,9 +5,9 @@ import { localStorageAdapter } from './storage/indexedDbAdapter'
 import { s3StorageAdapter } from './storage/s3Adapter'
 
 const mode = import.meta.env.VITE_STORAGE || 's3'
-const adapter = mode === 's3' ? s3StorageAdapter : localStorageAdapter
 
-export const addCv = adapter.addCv
-export const listCvs = adapter.listCvs
-export const getCv = adapter.getCv
-export const deleteCv = adapter.deleteCv
+// S3 for everything - listing and upload
+export const listCvs = s3StorageAdapter.listCvs
+export const getCv = s3StorageAdapter.getCv
+export const deleteCv = s3StorageAdapter.deleteCv
+export const addCv = s3StorageAdapter.addCv
