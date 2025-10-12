@@ -102,8 +102,35 @@ async function addCv(file) {
     return key
 }
 
-async function deleteCv() {
-    throw new Error('Delete is disabled in frontend-only S3 mode')
+async function deleteCv(id) {
+    // Delete object from S3 using public bucket (requires bucket to allow public DELETE)
+    const url = `https://${BUCKET}.s3.${REGION}.amazonaws.com/${encodeURIComponent(id)}`
+    
+    console.log('Attempting to delete:', url)
+    
+    try {
+        const response = await fetch(url, {
+            method: 'DELETE',
+        })
+        
+        console.log('Delete response status:', response.status)
+        console.log('Delete response headers:', Object.fromEntries(response.headers.entries()))
+        
+        if (!response.ok) {
+            const errorText = await response.text()
+            console.error('Delete failed response:', errorText)
+            throw new Error(`Delete failed: ${response.status} ${response.statusText} - ${errorText}`)
+        }
+        
+        console.log('Delete successful')
+        return true
+    } catch (error) {
+        console.error('Delete error:', error)
+        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            throw new Error('CORS hatası: AWS S3 bucket CORS ayarları DELETE metoduna izin vermiyor. Bucket policy\'de DELETE izni ve CORS konfigürasyonu gerekli.')
+        }
+        throw error
+    }
 }
 
 export const s3StorageAdapter = { addCv, listCvs, getCv, deleteCv }

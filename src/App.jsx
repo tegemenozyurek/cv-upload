@@ -92,7 +92,14 @@ function App() {
 			await deleteCv(id)
 			setItems((prev) => prev.filter((r) => r.id !== id))
 		} catch (e) {
-			setError(e?.message || 'Delete failed')
+			console.error('Delete error:', e)
+			// Eğer AWS'den silme başarısız olursa, en azından ekrandan kaldır
+			if (e.message.includes('CORS hatası') || e.message.includes('Failed to fetch')) {
+				setItems((prev) => prev.filter((r) => r.id !== id))
+				setError(`CV ekrandan kaldırıldı ancak AWS'den silinemedi: ${e.message}`)
+			} else {
+				setError(e?.message || 'Delete failed')
+			}
 		}
 	}
 
