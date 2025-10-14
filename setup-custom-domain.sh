@@ -183,3 +183,4 @@ echo "- CloudFront distribution güncellemesi 10-15 dakika sürebilir"
 echo ""
 echo -e "${YELLOW}💡 Test:${NC}"
 echo "Birkaç dakika sonra https://${DOMAIN_NAME} adresini test edin"
+

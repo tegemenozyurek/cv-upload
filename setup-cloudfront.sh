@@ -146,3 +146,4 @@ rm cloudfront-config.json
 # Distribution ID'yi kaydet
 echo "${DISTRIBUTION_ID}" > .cloudfront-distribution-id
 echo -e "${GREEN}💾 Distribution ID .cloudfront-distribution-id dosyasına kaydedildi${NC}"
+

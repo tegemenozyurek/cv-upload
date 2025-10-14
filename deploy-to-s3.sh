@@ -105,3 +105,4 @@ echo -e "${YELLOW}💡 Not:${NC}"
 echo "- Bu URL HTTP'dir. HTTPS için CloudFront kullanın."
 echo "- Bucket adı: ${BUCKET_NAME}"
 echo "- Region: ${REGION}"
+

@@ -1,0 +1,40 @@
+service: cv-upload-api
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: eu-north-1
+  environment:
+    S3_BUCKET: ${env:S3_BUCKET}
+    AWS_REGION: ${env:AWS_REGION}
+    S3_PREFIX: ${env:S3_PREFIX, 'cv-uploads/'}
+    ALLOW_ORIGIN: ${env:ALLOW_ORIGIN, '*'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+            - s3:ListBucket
+          Resource:
+            - arn:aws:s3:::${env:S3_BUCKET}
+            - arn:aws:s3:::${env:S3_BUCKET}/*
+
+functions:
+  api:
+    handler: serverless-handler.handler
+    events:
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+      - http:
+          path: /
+          method: ANY
+          cors: true
+
+plugins:
+  - serverless-http
+
