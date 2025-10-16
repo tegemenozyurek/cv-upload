@@ -4,7 +4,7 @@
 
 const BUCKET = import.meta.env.VITE_S3_BUCKET || 'cv-upload-bucket1'
 const REGION = import.meta.env.VITE_S3_REGION || 'eu-north-1'
-const PREFIX = import.meta.env.VITE_S3_PREFIX || ''
+const PREFIX = import.meta.env.VITE_S3_PREFIX || 'uploads/'
 
 function buildObjectUrl(key) {
     // Use the regional virtual-hosted–style URL
@@ -19,8 +19,9 @@ async function listCvs() {
     console.log('Fetching S3 objects from:', base)
     
     try {
-        // Try to get all files at once first
-        const allRes = await fetch(`${base}?list-type=2&max-keys=1000`)
+        // Try to get all files at once first; include prefix to satisfy bucket policies
+        const query = new URLSearchParams({ 'list-type': '2', 'max-keys': '1000', ...(PREFIX ? { prefix: PREFIX } : {}) })
+        const allRes = await fetch(`${base}?${query.toString()}`)
         console.log('All files response status:', allRes.status)
         
         if (allRes.ok) {
